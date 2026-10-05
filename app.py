@@ -39,6 +39,55 @@ def home():
 
 @app.route("/api/dashboard")
 def dashboard():
+    @app.route("/api/set-table/<table_name>", methods=["GET"])
+def set_table(table_name):
+
+    allowed_tables = [
+        "sales_original_300",
+        "sales_updated_300"
+    ]
+
+    if table_name not in allowed_tables:
+        return jsonify({
+            "error": "不允許的資料表"
+        }), 400
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS sales_config (
+                id INT PRIMARY KEY,
+                active_table VARCHAR(100) NOT NULL
+            )
+        """)
+
+        cursor.execute("""
+            INSERT INTO sales_config (id, active_table)
+            VALUES (1, %s)
+            ON DUPLICATE KEY UPDATE
+            active_table = %s
+        """, (table_name, table_name))
+
+        conn.commit()
+
+        return jsonify({
+            "success": True,
+            "table_name": table_name
+        })
+
+    except Exception as e:
+
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+    finally:
+
+        cursor.close()
+        conn.close()
 
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)

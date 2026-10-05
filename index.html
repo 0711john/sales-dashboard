@@ -229,7 +229,32 @@
     let productChart;
     let categoryChart;
     let channelChart;
+async function changeTable(tableName) {
 
+    try {
+
+        const response = await fetch(
+            API_URL + "/api/set-table/" + tableName
+        );
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error);
+        }
+
+        alert("已切換至：" + tableName);
+
+        loadDashboard();
+
+    } catch (error) {
+
+        console.error(error);
+
+        alert("切換資料失敗：" + error.message);
+
+    }
+}
     async function loadDashboard() {
 
         try {

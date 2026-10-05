@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Sales Dashboard</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, "Microsoft JhengHei", sans-serif;
+            background: #f5f7fa;
+            color: #222;
+        }
+
+        header {
+            background: #1f2937;
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }
+
+        header h1 {
+            margin: 0 0 10px;
+        }
+
+        #dataStatus {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+        }
+
+        .card h3 {
+            margin-top: 0;
+            color: #666;
+        }
+
+        .card p {
+            font-size: 25px;
+            font-weight: bold;
+            margin-bottom: 0;
+        }
+
+        .chart-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+        }
+
+        .chart-box {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+        }
+
+        .chart-box h2 {
+            margin-top: 0;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 350px !important;
+        }
+
+        .refresh {
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+        }
+
+        @media (max-width: 800px) {
+            .cards {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 500px) {
+            .cards {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>📊 Sales Dashboard</h1>
+    <div id="dataStatus">正在讀取資料...</div>
+</header>
+
+<div class="container">
+
+    <div class="cards">
+
+        <div class="card">
+            <h3>總銷售額</h3>
+            <p id="totalSales">--</p>
+        </div>
+
+        <div class="card">
+            <h3>總銷售數量</h3>
+            <p id="totalQuantity">--</p>
+        </div>
+
+        <div class="card">
+            <h3>退貨數量</h3>
+            <p id="totalReturned">--</p>
+        </div>
+
+        <div class="card">
+            <h3>資料筆數</h3>
+            <p id="totalRecords">--</p>
+        </div>
+
+    </div>
+
+    <div class="chart-grid">
+
+        <div class="chart-box">
+            <h2>📈 每日淨銷售額</h2>
+            <canvas id="dailyChart"></canvas>
+        </div>
+
+        <div class="chart-box">
+            <h2>📊 各商品淨銷售額</h2>
+            <canvas id="productChart"></canvas>
+        </div>
+
+        <div class="chart-box">
+            <h2>📊 各分類淨銷售額</h2>
+            <canvas id="categoryChart"></canvas>
+        </div>
+
+        <div class="chart-box">
+            <h2>📊 各通路淨銷售額</h2>
+            <canvas id="channelChart"></canvas>
+        </div>
+
+    </div>
+
+    <div class="refresh">
+        <button onclick="loadDashboard()">🔄 重新載入資料</button>
+        <p>也可以直接按 F5 更新網頁</p>
+    </div>
+
+</div>
+
+<script>
+
+    // 下一階段部署 Render 後，
+    // 把這裡改成 Render API 網址
+    const API_URL = "YOUR_RENDER_API_URL";
+
+    let dailyChart;
+    let productChart;
+    let categoryChart;
+    let channelChart;
+
+    async function loadDashboard() {
+
+        try {
+
+            const response = await fetch(API_URL + "/api/dashboard");
+
+            if (!response.ok) {
+                throw new Error("API 連線失敗");
+            }
+
+            const data = await response.json();
+
+            document.getElementById("dataStatus").innerText =
+                "目前資料：" + data.table_name;
+
+            document.getElementById("totalSales").innerText =
+                "$" + Number(data.summary.total_sales).toLocaleString();
+
+            document.getElementById("totalQuantity").innerText =
+                Number(data.summary.total_quantity).toLocaleString();
+
+            document.getElementById("totalReturned").innerText =
+                Number(data.summary.total_returned).toLocaleString();
+
+            document.getElementById("totalRecords").innerText =
+                Number(data.summary.total_records).toLocaleString();
+
+            drawCharts(data);
+
+        } catch (error) {
+
+            console.error(error);
+
+            document.getElementById("dataStatus").innerText =
+                "❌ 無法取得資料";
+
+        }
+
+    }
+
+
+    function drawCharts(data) {
+
+        if (dailyChart) dailyChart.destroy();
+        if (productChart) productChart.destroy();
+        if (categoryChart) categoryChart.destroy();
+        if (channelChart) channelChart.destroy();
+
+
+        // 每日
+        dailyChart = new Chart(
+            document.getElementById("dailyChart"),
+            {
+                type: "line",
+
+                data: {
+                    labels: data.daily.map(x => x.sale_date),
+
+                    datasets: [{
+                        label: "每日淨銷售額",
+
+                        data: data.daily.map(x => x.net_sales),
+
+                        borderWidth: 2,
+
+                        tension: 0.3
+                    }]
+                },
+
+                options: {
+                    responsive: true,
+
+                    plugins: {
+                        legend: {
+                            display: true
+                        }
+                    }
+                }
+            }
+        );
+
+
+        // 商品
+        productChart = new Chart(
+            document.getElementById("productChart"),
+            {
+                type: "bar",
+
+                data: {
+                    labels: data.product.map(x => x.product_name),
+
+                    datasets: [{
+                        label: "商品淨銷售額",
+
+                        data: data.product.map(x => x.net_sales),
+
+                        borderWidth: 1
+                    }]
+                },
+
+                options: {
+                    responsive: true
+                }
+            }
+        );
+
+
+        // 分類
+        categoryChart = new Chart(
+            document.getElementById("categoryChart"),
+            {
+                type: "doughnut",
+
+                data: {
+                    labels: data.category.map(x => x.category),
+
+                    datasets: [{
+                        label: "分類銷售額",
+
+                        data: data.category.map(x => x.net_sales),
+
+                        borderWidth: 1
+                    }]
+                },
+
+                options: {
+                    responsive: true
+                }
+            }
+        );
+
+
+        // 通路
+        channelChart = new Chart(
+            document.getElementById("channelChart"),
+            {
+                type: "bar",
+
+                data: {
+                    labels: data.channel.map(x => x.channel),
+
+                    datasets: [{
+                        label: "通路淨銷售額",
+
+                        data: data.channel.map(x => x.net_sales),
+
+                        borderWidth: 1
+                    }]
+                },
+
+                options: {
+                    responsive: true
+                }
+            }
+        );
+
+    }
+
+
+    // 網頁開啟時自動取得資料
+    loadDashboard();
+
+</script>
+
+</body>
+</html>
